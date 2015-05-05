@@ -1,12 +1,15 @@
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
+import java.io.*;
+import java.util.*;
 
 /**
- * 
+ * The <code>KruskalMinSpan</code> class represents the minimum span of a
+ * weighted graph.
+ * <p>
+ * The {@link #buildGraph} function parses data into a weighted graph, once the
+ * data has been parsed its minimum span is found using the Kruskal algorithm.
+ * Once the minimum span has been found, use the {@link #printMinSpan} function
+ * to print a {@code String} representation of the weighted graph's minimum
+ * span.
  * 
  * @author Jonathan A. Henly
  * @version 1.00 2015-04-17
@@ -17,9 +20,10 @@ public class KruskalMinSpan {
 
 	// Declare private members
 	private Edge[] edges;
-	private Edge[] parseEdges;
-	private HashMap<Edge, String> allEdges;
-	private int minWeight;
+	private HashMap<String, String> parents;
+	private HashSet<Edge> allEdges;
+	private ArrayList<Edge> minSpan;
+	private int spanWeight;
 
 	/**
 	 * The {@code Edge} class represents a weighted edge between two nodes.
@@ -44,8 +48,8 @@ public class KruskalMinSpan {
 		 *            - the weight of this {@code Edge}.
 		 */
 		public Edge(String first, String second, int weight) {
-			this.nOne = first;
-			this.nTwo = second;
+			this.nOne = (first.compareTo(second) < 0) ? first : second;
+			this.nTwo = (first.compareTo(second) > 0) ? first : second;
 			this.weight = weight;
 		}
 
@@ -81,7 +85,7 @@ public class KruskalMinSpan {
 		 * method.
 		 * <p>
 		 * The algorithm simply adds all the hash codes of the primary key
-		 * fields, multiplyihg each intermediate result by 31 (so that it's not
+		 * fields, multiplying each intermediate result by 31 (so that it's not
 		 * a simple sum of hash codes).
 		 * 
 		 * @see {@link java.util.List#hashCode java.util.List.hashCode()}
@@ -162,7 +166,7 @@ public class KruskalMinSpan {
 			return (this.getWeight() < that.getWeight()) ? -1 : ((this
 					.getWeight() == that.getWeight()) ? 0 : 1);
 		}
-		
+
 		@Override
 		public String toString() {
 			return String.format("%s,%d,%s", this.nOne, this.weight, this.nTwo);
@@ -178,12 +182,12 @@ public class KruskalMinSpan {
 	 */
 	public static void main(String[] args) {
 		// Declare local variables
-		KruskalMinSpan minSpan = null;
+		KruskalMinSpan minSpan;
 
 		minSpan = new KruskalMinSpan();
 
 		minSpan.buildGraph(new Scanner(getInputFile(args)));
-		
+		minSpan.printMinSpan();
 	}
 
 	/**
@@ -191,9 +195,80 @@ public class KruskalMinSpan {
 	 */
 	public KruskalMinSpan() {
 		this.edges = null;
-		this.parseEdges = null;
-		this.allEdges = new HashMap<Edge, String>();
-		this.minWeight = 0;
+		this.parents = new HashMap<String, String>();
+		this.allEdges = new HashSet<Edge>();
+		this.minSpan = new ArrayList<Edge>();
+		this.spanWeight = 0;
+	}
+
+	/**
+	 * Finds the minimum span of the weighted graph that was passed to
+	 * {@code buildGraph} as a {@code Scanner} object.
+	 * 
+	 * @see {@linkplain #buildGraph}
+	 */
+	private void findMinSpan() {
+		for (int i = 0; i < this.edges.length; i++) {
+			String nodeOne = this.edges[i].nOne;
+			String nodeTwo = this.edges[i].nTwo;
+			String rootOne = this.findRoot(nodeOne);
+			String rootTwo = this.findRoot(nodeTwo);
+
+			// check if the edge's nodes don't have the same root
+			if (!(rootOne.equals(rootTwo))) {
+				/*
+				 * If the first node's root is itself and the second node's root
+				 * isn't itself, then the second node's root should be the
+				 * overall root. If not then the first node's root should be the
+				 * overall root.
+				 */
+				if (nodeOne.equals(rootOne) && !(nodeTwo.equals(rootTwo))) {
+					// add this edge to the ArrayList minSpan
+					this.minSpan.add(this.edges[i]);
+					// add this edge's weight to the minimum span's weight
+					spanWeight += this.edges[i].weight;
+					// change nodeTwo's root to nodeOne's root
+					this.parents.put(nodeOne, rootTwo);
+				} else {
+					// add this edge to the ArrayList minSpan
+					this.minSpan.add(this.edges[i]);
+					// add this edge's weight to the minimum span's weight
+					spanWeight += this.edges[i].weight;
+					// change nodeOne's root to nodeTwo's root
+					this.parents.put(nodeTwo, rootOne);
+				}
+			}
+
+		}
+	}
+
+	/**
+	 * Recursively finds a passed in node's root.
+	 * 
+	 * @param node
+	 *            - the node whose root to find.
+	 * @return the root as a {@code String}.
+	 */
+	private String findRoot(String node) {
+		if (this.parents.get(node) == null) {
+			return node;
+		} else {
+			return findRoot(this.parents.get(node));
+		}
+	}
+
+	/**
+	 * Prints the minimum span to output.
+	 */
+	public void printMinSpan() {
+		String s = "";
+
+		for (Edge e : this.minSpan) {
+			s += String.format("%s%n", e.toString());
+		}
+		s += String.format("Min Span Weight: %d", this.spanWeight);
+
+		System.out.println(s);
 	}
 
 	/**
@@ -208,13 +283,10 @@ public class KruskalMinSpan {
 	public void buildGraph(Scanner inFile) {
 		this.edges = this.parseLines(inFile, 0);
 		Arrays.sort(this.edges);
-		
-		for(Map.Entry<Edge, String> entry : allEdges.entrySet()) {
-			System.out.println(entry.toString());
-		}
-		
+
+		this.findMinSpan();
 	}
-	
+
 	/**
 	 * A recursive helper function for the {@code buildGraph(Scanner)} method.
 	 * 
@@ -235,13 +307,15 @@ public class KruskalMinSpan {
 			Edge[] tmpEdges;
 
 			line.useDelimiter("\\s*,\\s*");
-			tmpEdges = parseLine(line.next(), line, 0);
+			tmpEdges = parseOneLine(line.next(), line, 0);
 
 			if (data.hasNextLine()) {
 				count = count + tmpEdges.length;
 				parseLines(data, count);
 			} else {
+				// close the Scanner
 				data.close();
+
 				count = count + tmpEdges.length;
 				this.edges = new Edge[count];
 			}
@@ -250,16 +324,14 @@ public class KruskalMinSpan {
 				count = count - 1;
 				this.edges[count] = tmpEdges[i];
 			}
-
-			// System.out.println("c: " + count + "\ne: "
-					// + Arrays.toString(this.edges));
 		}
-		
+
 		return this.edges;
 	}
 
 	/**
-	 * A recursive helper function for the {@code parseLines(Scanner, int)} method.
+	 * A recursive helper function for the {@code parseLines(Scanner, int)}
+	 * method.
 	 * 
 	 * @param nOne
 	 *            - placeholder for the first node in the {@code Edge} object.
@@ -274,38 +346,38 @@ public class KruskalMinSpan {
 	 * @see {@linkplain #parseLines(Scanner, int)}
 	 * @see {@linkplain java.util.Scanner}
 	 */
-	private Edge[] parseLine(String nOne, Scanner line, int count) {
+	private Edge[] parseOneLine(String nOne, Scanner line, int count) {
 		if (line.hasNext()) {
 			int weight = line.nextInt();
 			String nTwo = line.next();
 			Edge edge = new Edge(nOne, nTwo, weight);
 
-			if (!this.allEdges.containsKey(edge)) {
-				this.allEdges.put(edge, edge.nOne);
+			// check if this edge or it's flip, has already been added
+			if (!this.allEdges.contains(edge)) {
+				this.allEdges.add(edge);
+				this.parents.put(edge.nOne, null);
+				this.parents.put(edge.nTwo, null);
 			} else {
 				edge = null;
 				count -= 1;
 			}
 
 			if (line.hasNext()) {
-				parseLine(nOne, line, ++count);
+				parseOneLine(nOne, line, ++count);
 			} else {
+				// close the Scanner
 				line.close();
+
 				count += 1;
-				this.parseEdges = new Edge[count];
+				this.edges = new Edge[count];
 			}
 
 			if (edge != null) {
-				this.parseEdges[count - 1] = edge;
+				this.edges[count - 1] = edge;
 			}
 		}
-		
-		return this.parseEdges;
-	}
-	
-	
-	public void findRoot(String nOne, String nTwo) {
 
+		return this.edges;
 	}
 
 	/**
